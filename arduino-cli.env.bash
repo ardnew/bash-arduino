@@ -11,7 +11,7 @@ _arduino-build-cache()
 	echo "${build_root}.cache"
 }
 
-arduino-fqbn()
+fqbn()
 {
 	if [[ $# -eq 0 ]]
 	then 
@@ -28,14 +28,15 @@ arduino-build-help()
 {
 	printf "usage:\n"
 	printf "\n"
-	printf "\t# list all connected boards\n"
+	printf "\t- list all connected boards\n"
 	printf "\t\tarduino-build -l\n"
 	printf "\n"
-	printf "\t# list recognized boards, optionally those matching a pattern\n"
+	printf "\t- list recognized boards, optionally those matching a pattern\n"
 	printf "\t\tarduino-build -a [pattern]\n"
 	printf "\n"
-	printf "\t# compile sketch, uploading to port if -p is given, verify with -t.\n"
-	printf "\t# uploads without compiling if -u is also given.\n"
+	printf "\t- compile sketch, uploading to port if -p is given, verifies with -t.\n"
+	printf "\t- uploads without compiling if -u is also given.\n"
+	printf "\t- uses current directory if sketch -s is not provided.\n"
 	printf "\t\tarduino-build -b fqbn [[-u] [-t] -p port] [-s sketch] [-v level]\n"
 	printf "\n"
 	printf "\n"
@@ -93,7 +94,7 @@ arduino-build()
 		fqbn=$ARDUINO_FQBN
 	fi
 
-	mapfile -t matches < <( arduino-fqbn 2>/dev/null | grep "$fqbn" )
+	mapfile -t matches < <( fqbn 2>/dev/null | grep "$fqbn" )
 	if [[ ${#matches[@]} -eq 0 ]]
 	then
 		echo "unsupported board name: $fqbn"
@@ -121,18 +122,18 @@ arduino-build()
 			echo "sketch not found: ${sketch}/${base}.ino"
 			return 4
 		fi
-		#sketch="${sketch}/${base}.ino"
 
 	elif [[ -f "$sketch" ]] && [[ "$sketch" =~ \.ino$ ]]
 	then
 		base=$( basename "$sketch" .ino )
-		sdir=$( dirname "$sketch" )
-		if [[ "$base" != "$sdir" ]]
+		sketchdir=$( dirname "$sketch" )
+		sketchbase=$( basename "$sdir" )
+		if [[ "$base" != "$sketchbase" ]]
 		then
-			echo "sketch name does not match parent directory: $sketch"
+			echo "invalid sketch name ($base) for directory ($sketchbase): $sketch"
 			return 5
 		fi
-		sketch=$sdir
+		sketch=$sketchdir
 	else
 		echo "invalid sketch: $sketch"
 		return 6
@@ -226,3 +227,12 @@ arduino-build()
 	$cmd
 }
 
+arc-help()
+{
+	arduino-build-help $@
+}
+
+arc()
+{
+	arduino-build $@
+}
