@@ -70,8 +70,8 @@ arduino-env-load()
 	if [[ -f "$envfile" ]]
 	then
 		. "$envfile"
-		[[ -n $FQBN ]] && export ARDUINO_FQBN=$FQBN
-		[[ -n $PORT ]] && export ARDUINO_PORT=$PORT
+		[[ -n $FQBN ]] && ARDUINO_FQBN=$FQBN
+		[[ -n $PORT ]] && ARDUINO_PORT=$PORT
 	else
 		local abssketch=$( readlink -f "$sketch" )
 		local filename=$( arduino-env-filename )
@@ -154,7 +154,7 @@ ino()
 
 	configfile=$( arduino-cli-config-file )
 	config=$( printf -- '--config-file "%s"' "$configfile" )
-	userdir=$HOME/Development/arduino/sketchbook
+	userdir=$( arduino-sketchbook )
 
 	# Trace, Debug, Info, Warning, Error, Fatal, Panic
 	verbose="trace"
@@ -259,16 +259,20 @@ ino()
 	fi
 
 	mapfile -t matches < <( fqbn 2>/dev/null | grep "$fqbn" )
+	mapfile -t exactmatches < <( fqbn 2>/dev/null | grep "^${fqbn}$" )
 	if [[ ${#matches[@]} -eq 0 ]]
 	then
 		echo "unsupported board name: $fqbn"
 		return 5
 	elif [[ ${#matches[@]} -gt 1 ]]
 	then
-		echo "ambiguous board name: $fqbn"
-		echo "alternatives:"
-		for b in ${matches[@]}; do echo "	$b"; done
-		return 6
+		if [[ ${#exactmatches[@]} -ne 1 ]]
+		then
+			echo "ambiguous board name: $fqbn"
+			echo "alternatives:"
+			for b in ${matches[@]}; do echo "	$b"; done
+			return 6
+		fi
 	else
 		fqbn=${matches[0]}
 	fi
@@ -277,7 +281,7 @@ ino()
 	cache="$( arduino-build-cache )/${base}"
 	binname=$( printf "%s.%s.%s" "$base" "$fqbn" "bin" | tr ':' '.' )
 
-	local fqbnconfig portconfig buildconfig cacheconfig inputconfig logconfig verifyconfig
+	local fqbnconfig portconfig buildconfig cacheconfig inputconfig outputconfig logconfig verifyconfig
 
 	fqbnconfig="--fqbn $fqbn"
 
@@ -303,6 +307,7 @@ ino()
 		portconfig="--upload --port $port"
 		buildconfig="--build-path $build"
 		cacheconfig="--build-cache-path $cache"
+		outputconfig="--output ${build}/${base}.ino"
 		[[ -n $verify ]] && verifyconfig="--verify"
 
 	else
@@ -311,6 +316,7 @@ ino()
 		upload="no"
 		buildconfig="--build-path $build"
 		cacheconfig="--build-cache-path $cache"
+		outputconfig="--output ${build}/${base}.ino"
 		if [[ -n $verify ]]
 		then
 			echo "warning: ignoring verify flag (-t) on compile-only"
@@ -363,7 +369,7 @@ __AUTOCONF__
 	echo
 	echo "=================================================================="
 
-	cmd="arduino-cli $config $cmd $logconfig $fqbnconfig $portconfig $verifyconfig $buildconfig $cacheconfig $inputconfig $sketch"
+	cmd="arduino-cli $config $cmd $logconfig $fqbnconfig $portconfig $verifyconfig $buildconfig $cacheconfig $inputconfig $outputconfig $sketch"
 	echo
 	echo "------------------------------------------------------------------"
 	printf '$ %s\n' "$cmd"
