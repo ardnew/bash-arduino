@@ -1,37 +1,94 @@
 #!/bin/bash
 
-arduino-cli-config-file()
+arduino-prefix()
 {
-	echo "$HOME/.config/arduino-cli/config.yaml"
+	echo "/usr/local"
 }
 
-_arduino-cli-config-file-exists()
+arduino-root()
 {
-	local path="$( arduino-cli-config-file )"
+	local prefix=$( arduino-prefix )
+	echo "${prefix}/lib/arduino"
+}
+
+arduino-sketchbook()
+{
+	local prefix=$( arduino-prefix )
+	echo "${prefix}/src/arduino"
+}
+
+arduino-cli-config-file()
+{
+	local root=$( arduino-root )
+	echo "${root}/config.yaml"
+}
+
+arduino-cli-config-file-exists()
+{
+	local path=$( arduino-cli-config-file )
 	[[ -f "$path" ]] && return 0
 	{
 		echo "== **ERROR** ======================"
 		echo " arduino-cli config file not found "
 		echo "==================================="
-		echo "-> $path"
+		echo " -> config: ${path}"
 	} >&2
 	return 1
 }
 
-_arduino-build-root()
+arduino-build-root()
 {
-	echo "$HOME/.tmp/arduino-build"
+	echo "${HOME}/.tmp/arduino-build"
 }
 
-_arduino-build-cache()
+arduino-build-cache()
 {
-	build_root=$( _arduino-build-root )
-	echo "${build_root}.cache"
+	local root=$( arduino-build-root )
+	echo "${root}.cache"
+}
+
+arduino-env-filename()
+{
+	echo ".arduino.env"
+}
+
+arduino-env-file()
+{
+	local sketch=$1
+	local filename=$( arduino-env-filename )
+	[[ -d "$sketch" ]] && echo "${sketch}/${filename}"
+}
+
+arduino-env-load()
+{
+	unset -v ARDUINO_FQBN ARDUINO_PORT
+
+	local sketch=$PWD
+	[[ $# -gt 0 ]] && sketch=$1
+
+	local envfile=$( arduino-env-file "$sketch" )
+	if [[ -f "$envfile" ]]
+	then
+		. "$envfile"
+		[[ -n $FQBN ]] && export ARDUINO_FQBN=$FQBN
+		[[ -n $PORT ]] && export ARDUINO_PORT=$PORT
+	else
+		local abssketch=$( readlink -f "$sketch" )
+		local filename=$( arduino-env-filename )
+		{
+			echo "== **ERROR** ==================================="
+			echo " arduino env file not found in sketch directory "
+			echo "================================================"
+			echo " -> sketch: ${abssketch}"
+			echo " -> file: ${filename}"
+		} >&2
+		return 1
+	fi
 }
 
 fqbn()
 {
-	_arduino-cli-config-file-exists || return 1
+	arduino-cli-config-file-exists || return 1
 	local config="--config-file $( arduino-cli-config-file )"
 
 	if [[ $# -eq 0 ]]
@@ -47,14 +104,8 @@ fqbn()
 		command grep -oP '([^\s:]+:[^\s:]+:[^\s:]+)'
 }
 
-_arduino-env-file()
-{
-	echo ".arduino.env"
-}
-
 ino-help()
 {
-
 	printf "usage:\n"
 	printf "\n"
 	printf "\tino -l\n"
@@ -92,16 +143,17 @@ ino-help()
 	printf "\n"
 	printf "\n"
 
-	_arduino-cli-config-file-exists
+	arduino-cli-config-file-exists
 }
 
 ino()
 {
-	_arduino-cli-config-file-exists || return 1
+	arduino-cli-config-file-exists || return 1
 
-	local args arg cmd cli config fqbn port sketch userdir mode cmd upload build cache verbose verify binname writeconf autoconf
+	local args arg cmd cli configfile config fqbn port sketch userdir mode cmd upload build cache verbose verify binname writeconf autoconf
 
-	config="--config-file $( arduino-cli-config-file )"
+	configfile=$( arduino-cli-config-file )
+	config=$( printf -- '--config-file "%s"' "$configfile" )
 	userdir=$HOME/Development/arduino/sketchbook
 
 	# Trace, Debug, Info, Warning, Error, Fatal, Panic
@@ -188,13 +240,7 @@ ino()
 
 	if [[ -n $autoconf ]]
 	then
-		envfile="$sketch/$( _arduino-env-file )"
-		if [[ -f "$envfile" ]]
-		then
-			. "$envfile"
-			[[ -n $FQBN ]] && ARDUINO_FQBN=$FQBN
-			[[ -n $PORT ]] && ARDUINO_PORT=$PORT
-		fi
+		arduino-env-load "$sketch" || return 1
 	fi
 
 	if [[ -z $fqbn ]]
@@ -227,8 +273,8 @@ ino()
 		fqbn=${matches[0]}
 	fi
 
-	build="$( _arduino-build-root )/${base}"
-	cache="$( _arduino-build-cache )/${base}"
+	build="$( arduino-build-root )/${base}"
+	cache="$( arduino-build-cache )/${base}"
 	binname=$( printf "%s.%s.%s" "$base" "$fqbn" "bin" | tr ':' '.' )
 
 	local fqbnconfig portconfig buildconfig cacheconfig inputconfig logconfig verifyconfig
@@ -239,7 +285,7 @@ ino()
 	then
 		if [[ -z $port ]]
 		then
-			echo "no upload port (-p) provided"
+			echo "no upload port (-p) provided (and ARDUINO_PORT not defined)"
 			return 7
 		fi
 		mode="upload"
@@ -273,7 +319,8 @@ ino()
 
 	if [[ -n $writeconf ]]
 	then
-		cat <<__AUTOCONF__ > "$sketch/$( _arduino-env-file )"
+		envfile=$( arduino-env-file "$sketch" )
+		cat <<__AUTOCONF__ > "$envfile"
 # automatically generated - edit if you want i guess
 FQBN=$fqbn
 PORT=$port
@@ -287,7 +334,7 @@ __AUTOCONF__
 
 	echo "== SETTINGS ======================================================"
 	echo
-	echo "  config         - $config"
+	echo "  config         - $configfile"
 	echo "  mode           - $mode"
 	echo "  board (fqbn)   - $fqbn"
 	echo "  upload         - $upload"
