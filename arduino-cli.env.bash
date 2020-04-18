@@ -1,5 +1,8 @@
 #!/bin/bash
 
+__name__="ino"
+__version__="0.1.0"
+
 arduino-prefix()
 {
 	echo "/usr/local"
@@ -106,42 +109,46 @@ fqbn()
 
 ino-help()
 {
-	printf "usage:\n"
-	printf "\n"
-	printf "\tino -l\n"
-	printf "\tino -a [PATTERN]\n"
-	printf "\tino -b FQBN [-p PORT [-u] [-t]] [-s SKETCH] [-v LEVEL] [-w]\n"
-	printf "\tino cli ...\n"
-	printf "\n"
-	printf "\n"
-	printf "options:\n"
-	printf "\n"
-	printf "\t-l              - list all boards connected to the system\n"
-	printf "\n"
-	printf "\t-a [PATTERN]    - list all known fully-qualified board names, optionally filtered\n"
-	printf "\t                  by those matching PATTERN\n"
-	printf "\n"
-	printf "\t-b FQBN         - use board with given FQBN\n"
-	printf "\n"
-	printf "\t-p PORT         - upload to device connected to serial port at path PORT\n"
-	printf "\n"
-	printf "\t-u              - upload without recompiling (requires: -p)\n"
-	printf "\n"
-	printf "\t-t              - verify executable after uploading (requires: -p)\n"
-	printf "\n"
-	printf "\t-s SKETCH       - compile/upload sketch at path SKETCH, or uses \$PWD if -s option\n"
-	printf "\t                  is not provided\n"
-	printf "\n"
-	printf "\t-v LEVEL        - use verbosity LEVEL (trace debug info warning error fatal panic)\n"
-	printf "\n"
-	printf "\t-w              - write configuration to file for use with autoconfig (-x)\n"
-	printf "\n"
-	printf "\t-x              - use FQBN/PORT in configuration file defined in sketch directory\n"
-	printf "\n"
-	printf "\tcli ...         - invoke arduino-cli, passing all arguments on as subcommands, but\n"
-	printf "\t                  using the configuration file associated with this environment\n"
-	printf "\n"
-	printf "\n"
+	printf -- "%s version %s usage:\n" "${__name__}" "${__version__}"
+	printf -- "\n"
+	printf -- "\tino -l\n"
+	printf -- "\tino -a [PATTERN]\n"
+	printf -- "\tino -b FQBN [-p PORT [-u] [-t]] [-k] [-s SKETCH] [-v LEVEL] [-w]\n"
+	printf -- "\tino -x [-b FQBN] [-p PORT [-u] [-t]] [-k] [-s SKETCH] [-v LEVEL]\n"
+	printf -- "\tino cli ...\n"
+	printf -- "\n"
+	printf -- "\n"
+	printf -- "options:\n"
+	printf -- "\n"
+	printf -- "\t-l              - list all boards connected to the system\n"
+	printf -- "\n"
+	printf -- "\t-a [PATTERN]    - list all known fully-qualified board names, optionally filtered\n"
+	printf -- "\t                  by those matching PATTERN\n"
+	printf -- "\n"
+	printf -- "\t-b FQBN         - use board with given FQBN\n"
+	printf -- "\n"
+	printf -- "\t-p PORT         - upload to device connected to serial port at path PORT\n"
+	printf -- "\n"
+	printf -- "\t-u              - upload without recompiling (requires: -p)\n"
+	printf -- "\n"
+	printf -- "\t-t              - verify executable after uploading (requires: -p)\n"
+	printf -- "\n"
+	printf -- "\t-k              - use --output flag to explicitly define upload artifact location.\n"
+	printf -- "\t                    (REQUIRED for Adafruit_nRF52 targets only; bug workaround)\n"
+	printf -- "\n"
+	printf -- "\t-s SKETCH       - compile/upload sketch at path SKETCH, or uses \$PWD if -s option\n"
+	printf -- "\t                  is not provided\n"
+	printf -- "\n"
+	printf -- "\t-v LEVEL        - use verbosity LEVEL (trace debug info warning error fatal panic)\n"
+	printf -- "\n"
+	printf -- "\t-w              - write configuration to file for use with autoconfig (-x)\n"
+	printf -- "\n"
+	printf -- "\t-x              - use FQBN/PORT in configuration file defined in sketch directory\n"
+	printf -- "\n"
+	printf -- "\tcli ...         - invoke arduino-cli, passing all arguments on as subcommands, but\n"
+	printf -- "\t                  using the configuration file associated with this environment\n"
+	printf -- "\n"
+	printf -- "\n"
 
 	arduino-cli-config-file-exists
 }
@@ -150,7 +157,7 @@ ino()
 {
 	arduino-cli-config-file-exists || return 1
 
-	local args arg cmd cli configfile config fqbn port sketch userdir mode cmd upload build cache verbose verify binname writeconf autoconf
+	local args arg cmd cli configfile config fqbn port sketch userdir mode cmd upload build cache verbose verify setoutput binname writeconf autoconf
 
 	configfile=$( arduino-cli-config-file )
 	config=$( printf -- '--config-file "%s"' "$configfile" )
@@ -169,6 +176,7 @@ ino()
 		(-p)	shift; port=$1 ;;
 		(-u)	upload=1 ;;
 		(-t)	verify=1 ;;
+		(-k)	setoutput=1 ;;
 		(-s)	shift; sketch=$1 ;;
 		(-v)	shift; verbose=$1 ;;
 		(-w)	writeconf=1 ;;
@@ -253,11 +261,6 @@ ino()
 		fqbn=$ARDUINO_FQBN
 	fi
 
-	if [[ -z $port ]]
-	then
-		port=$ARDUINO_PORT
-	fi
-
 	mapfile -t matches < <( fqbn 2>/dev/null | grep "$fqbn" )
 	mapfile -t exactmatches < <( fqbn 2>/dev/null | grep "^${fqbn}$" )
 	if [[ ${#matches[@]} -eq 0 ]]
@@ -275,6 +278,20 @@ ino()
 		fi
 	else
 		fqbn=${matches[0]}
+	fi
+
+	if [[ -z $port ]]
+	then
+		port=$ARDUINO_PORT
+	fi
+
+	if [[ -z $setoutput ]]
+	then
+		if [[ "$fqbn" =~ ^adafruit:nrf52 ]]
+		then
+			echo "enabling artifact output flag (-k) for Adafruit_nRF52 targets"
+			setoutput=1
+		fi
 	fi
 
 	build="$( arduino-build-root )/${base}"
@@ -307,7 +324,7 @@ ino()
 		portconfig="--upload --port $port"
 		buildconfig="--build-path $build"
 		cacheconfig="--build-cache-path $cache"
-		outputconfig="--output ${build}/${base}.ino"
+		[[ -n $setoutput ]] && outputconfig="--output ${build}/${base}.ino"
 		[[ -n $verify ]] && verifyconfig="--verify"
 
 	else
@@ -316,7 +333,7 @@ ino()
 		upload="no"
 		buildconfig="--build-path $build"
 		cacheconfig="--build-cache-path $cache"
-		outputconfig="--output ${build}/${base}.ino"
+		[[ -n $setoutput ]] && outputconfig="--output ${build}/${base}.ino"
 		if [[ -n $verify ]]
 		then
 			echo "warning: ignoring verify flag (-t) on compile-only"
