@@ -382,6 +382,8 @@ __AUTOCONF__
 	echo "	$cacheconfig"
 	[[ -n $inputconfig ]] &&
 	echo "	$inputconfig"
+	[[ -n $outputconfig ]] &&
+	echo "	$outputconfig"
 	echo "		$sketch"
 	echo
 	echo "=================================================================="
