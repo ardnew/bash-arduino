@@ -133,9 +133,9 @@ ino-help()
 	printf -- "\n"
 	printf -- "\t-t              - verify executable after uploading (requires: -p)\n"
 	printf -- "\n"
-	printf -- "\t-k              - use --output flag to explicitly define upload artifact location.\n"
-	printf -- "\t                    (REQUIRED for Adafruit_nRF52 targets only; bug workaround)\n"
-	printf -- "\n"
+#	printf -- "\t-k              - use --output flag to explicitly define upload artifact location.\n"
+#	printf -- "\t                    (REQUIRED for Adafruit_nRF52 targets only; bug workaround)\n"
+#	printf -- "\n"
 	printf -- "\t-s SKETCH       - compile/upload sketch at path SKETCH, or uses \$PWD if -s option\n"
 	printf -- "\t                  is not provided\n"
 	printf -- "\n"
@@ -176,7 +176,6 @@ ino()
 		(-p)	shift; port=$1 ;;
 		(-u)	upload=1 ;;
 		(-t)	verify=1 ;;
-		(-k)	setoutput=1 ;;
 		(-s)	shift; sketch=$1 ;;
 		(-v)	shift; verbose=$1 ;;
 		(-w)	writeconf=1 ;;
@@ -285,15 +284,6 @@ ino()
 		port=$ARDUINO_PORT
 	fi
 
-	if [[ -z $setoutput ]]
-	then
-		if [[ "$fqbn" =~ ^adafruit:nrf52 ]]
-		then
-			echo "enabling artifact output flag (-k) for Adafruit_nRF52 targets"
-			setoutput=1
-		fi
-	fi
-
 	build="$( arduino-build-root )/${base}"
 	cache="$( arduino-build-cache )/${base}"
 	binname=$( printf "%s.%s.%s" "$base" "$fqbn" "bin" | tr ':' '.' )
@@ -324,7 +314,7 @@ ino()
 		portconfig="--upload --port $port"
 		buildconfig="--build-path $build"
 		cacheconfig="--build-cache-path $cache"
-		[[ -n $setoutput ]] && outputconfig="--output ${build}/${base}.ino"
+#		outputconfig="--output-dir $build"
 		[[ -n $verify ]] && verifyconfig="--verify"
 
 	else
@@ -333,7 +323,7 @@ ino()
 		upload="no"
 		buildconfig="--build-path $build"
 		cacheconfig="--build-cache-path $cache"
-		[[ -n $setoutput ]] && outputconfig="--output ${build}/${base}.ino"
+#		outputconfig="--output-dir $build"
 		if [[ -n $verify ]]
 		then
 			echo "warning: ignoring verify flag (-t) on compile-only"
@@ -363,6 +353,7 @@ __AUTOCONF__
 	echo "  upload         - $upload"
 	echo "  sketchbook     - $userdir"
 	echo "  sketch         - $base"
+	echo "  output         - $build"
 	echo "  log level      - $verbose"
 	echo
 	echo "=================================================================="
