@@ -110,7 +110,7 @@ fqbn()
 		} >&2
 	fi
 
-	arduino-cli board listall $config $@ | \
+	arduino-cli board listall $config "${@}" | \
 		command grep -oP '([^\s:]+:[^\s:]+:[^\s:]+)'
 }
 
@@ -212,7 +212,7 @@ ino()
 		then
 			if [[ $arg == "listall" ]]
 			then
-				arduino-cli board listall ${args[@]}
+				arduino-cli board listall "${args[@]}"
 				return 0
 			elif [[ $arg == "list" ]]
 			then
@@ -279,7 +279,7 @@ ino()
 		then
 			echo "ambiguous board name: $fqbn"
 			echo "alternatives:"
-			for b in ${matches[@]}; do echo "	$b"; done
+			for b in "${matches[@]}"; do echo "	$b"; done
 			return 6
 		fi
 	else
