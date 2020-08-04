@@ -3,14 +3,29 @@
 
 Last tested with [arduino/arduino-cli](https://github.com/arduino/arduino-cli) version 0.11.0 ([466c8c2](https://github.com/arduino/arduino-cli/commit/466c8c2f8471736d755079ec0e6e2a4a19dad413)).
 
-## Example usage for primary functions
+## Quickstart
 
 The following assume the `arduino-cli.env.bash` script has been sourced already. If not, see [Installation](#installation) below.
 ```sh
-# list all connected USB devices and their                          
+# list all detected target devices (along with serial port device and FQBN) connected via USB
 $ ino -l
 
-[ ... TODO ... ]
+# list all known supported targets and their FQBN
+$ ino -a
+
+# list the FQBN for all known STM32 boards
+$ ino -a stm32
+
+# compile+upload sketch in current directory for the ItsyBitsy nRF52840 connected on port /dev/ttyACM0,
+#   and save build command configuration to file ".arduino.env" in sketch directory.
+$ ino -b "adafruit:nrf52:itsybitsy52840" -p /dev/ttyACM0 -w
+
+# compile+upload sketch in current directory using the configuration saved in previous step.
+$ ino -x
+
+# compile+upload sketch in current directory using the saved configuration, but override serial port.
+$ ino -x -p /dev/ttyACM1
+
 ```
 
 ## Installation
